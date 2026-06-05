@@ -81,8 +81,11 @@ print(f"the factorial of {n} is {product}")
 
 #problem8: star pattern ko i times print karo 
 
+i = int(input("enter the number of times to print pattern: "))
+n = int(input("enter the number for pattern size: "))
 
-
-
-
-
+for j in range(i):
+    for k in range(1, n+1):
+        print(" "*(n-k), end="")
+        print("*"*(2*k-1))
+    print()  # blank line between patterns
