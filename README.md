@@ -1,4 +1,5 @@
-                                                        **Python-Basics-Practice**
+
+ **Python-Basics-Practice**
 ​Welcome to my Python learning journey! This repository is dedicated to mastering the fundamentals of Python programming. Here, I document various concepts, code snippets, and practice problems that I solve to strengthen my programming logic.
 ​
 **🚀 About this Repository**
