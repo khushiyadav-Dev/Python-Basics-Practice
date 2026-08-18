@@ -6,7 +6,7 @@ friends.append("khushi") #append ek method h jo ki end of the list insertion kar
 
 #append = at the end 
 
-🔹 Common List Methods:
+**Common List Methods:
 append(x) → List ke end me element add karta hai
 extend(iterable) → Multiple elements add karta hai (list merge jaisa)
 insert(i, x) → Specific index par element add karta hai
