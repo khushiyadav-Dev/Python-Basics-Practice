@@ -1,0 +1,163 @@
+"""Mini Project 1 — CLI Expense Tracker
+Day 1: core logic (data model, JSON save/load, validation, summary)
+"""
+
+import json
+from dataclasses import dataclass, asdict
+from datetime import date
+from pathlib import Path
+
+BASE = Path(__file__).parent
+DATA_FILE = BASE / "expenses.json"
+
+CATEGORIES = {"food", "travel", "shopping", "bills", "education", "other"}
+MAX_NOTE_LEN = 60
+
+
+# ------------------------- data model -------------------------
+@dataclass
+class Expense:
+    id: int
+    amount: float
+    category: str
+    note: str = ""
+    date: str = ""
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Expense":
+        return cls(
+            id=int(d["id"]),
+            amount=float(d["amount"]),
+            category=str(d["category"]),
+            note=d.get("note", ""),
+            date=d.get("date", ""),
+        )
+
+
+# ------------------------- persistence -------------------------
+def load_expenses(path: Path = DATA_FILE) -> list[Expense]:
+    """File se expenses padho. File na ho ya kharab ho to khali list."""
+    if not path.exists():
+        return []
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        print(f"Warning: {path.name} kharab hai, khali list se shuru")
+        return []
+    return [Expense.from_dict(item) for item in raw]
+
+
+def save_expenses(expenses: list[Expense], path: Path = DATA_FILE) -> None:
+    """Poori list ko JSON mein likho (indent=2 se readable rehta hai)."""
+    path.write_text(
+        json.dumps([e.to_dict() for e in expenses], indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+def next_id(expenses: list[Expense]) -> int:
+    """Naya id: sabse bada id + 1 (delete ke baad bhi safe)."""
+    return max((e.id for e in expenses), default=0) + 1
+
+
+# ------------------------- validation + add -------------------------
+def add_expense(expenses: list[Expense], amount, category: str,
+                note: str = "", when: str | None = None) -> Expense:
+    """Validated expense add karta hai. Galat input par ValueError."""
+    try:
+        amount = round(float(amount), 2)
+    except (TypeError, ValueError):
+        raise ValueError(f"amount number hona chahiye, mila: {amount!r}")
+
+    if amount <= 0:
+        raise ValueError("amount 0 se bada hona chahiye")
+
+    category = category.strip().lower()
+    if category not in CATEGORIES:
+        raise ValueError(f"category galat hai. Allowed: {sorted(CATEGORIES)}")
+
+    note = note.strip()[:MAX_NOTE_LEN]
+
+    if when is None:
+        when = date.today().isoformat()
+    else:
+        try:
+            when = date.fromisoformat(when).isoformat()
+        except ValueError:
+            raise ValueError(f"date YYYY-MM-DD format mein honi chahiye, mila: {when!r}")
+
+    expense = Expense(id=next_id(expenses), amount=amount, category=category, note=note, date=when)
+    expenses.append(expense)
+    return expense
+
+
+# ------------------------- summary -------------------------
+def total(expenses: list[Expense]) -> float:
+    return round(sum(e.amount for e in expenses), 2)
+
+
+def by_category(expenses: list[Expense]) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for e in expenses:
+        totals[e.category] = round(totals.get(e.category, 0) + e.amount, 2)
+    return dict(sorted(totals.items(), key=lambda kv: -kv[1]))
+
+
+def summary(expenses: list[Expense]) -> dict:
+    if not expenses:
+        return {"count": 0, "total": 0.0, "average": 0.0, "biggest": None, "categories": {}}
+    biggest = max(expenses, key=lambda e: e.amount)
+    return {
+        "count": len(expenses),
+        "total": total(expenses),
+        "average": round(total(expenses) / len(expenses), 2),
+        "biggest": biggest,
+        "categories": by_category(expenses),
+    }
+
+
+# ------------------------- demo run -------------------------
+if __name__ == "__main__":
+    expenses = load_expenses()
+    print(f"File se {len(expenses)} expenses mile\n")
+
+    # 5 expenses add karo (kuch jaan-boojh ke galat)
+    inputs = [
+        (250, "food", "lunch with team", "2026-11-24"),
+        (120, "travel", "auto to office", "2026-11-24"),
+        (1499, "shopping", "running shoes", "2026-11-25"),
+        ("89.5", "food", "chai + snacks", "2026-11-25"),
+        (700, "bills", "electricity", "2026-11-26"),
+    ]
+    for amount, category, note, when in inputs:
+        e = add_expense(expenses, amount, category, note, when)
+        print(f"added #{e.id}  Rs {e.amount:>7.2f}  {e.category:<9} {e.note}")
+
+    print("\n--- Galat input ke cases ---")
+    for bad in [(0, "food"), (-50, "travel"), (100, "grocery"), ("abc", "food")]:
+        try:
+            add_expense(expenses, *bad)
+        except ValueError as err:
+            print(f"  {bad} -> {err}")
+
+    save_expenses(expenses)
+
+    print("\n--- Summary ---")
+    s = summary(expenses)
+    print(f"count   : {s['count']}")
+    print(f"total   : Rs {s['total']:,.2f}")
+    print(f"average : Rs {s['average']:,.2f}")
+    print(f"biggest : Rs {s['biggest'].amount:,.2f} ({s['biggest'].category})")
+    print("by category:")
+    for cat, amt in s["categories"].items():
+        pct = amt / s["total"] * 100
+        print(f"  {cat:<9} Rs {amt:>8,.2f}  {pct:>5.1f}%")
+
+    print("\n--- File se dobara load (persistence check) ---")
+    reloaded = load_expenses()
+    print("reload ke baad count:", len(reloaded))
+    print("JSON ka pehla record:")
+    print(json.dumps(json.loads(DATA_FILE.read_text(encoding="utf-8"))[0], indent=2, ensure_ascii=False))
